@@ -68,16 +68,40 @@ function App() {
       // Replace with your actual Flask API endpoint
       const response = await fetch(BACKEND_URL, {
         method: 'POST',
+        headers: {
+          'ngrok-skip-browser-warning': 'true', // Skip ngrok browser warning
+        },
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('Failed to process invoice');
+        const errorText = await response.text();
+        throw new Error(`Failed to process invoice: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      const result = await response.json();
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const responseText = await response.text();
+        throw new Error(`Expected JSON response but got: ${contentType}. Response: ${responseText}`);
+      }
+
+      let result = await response.json();
+      console.log('OCR Result received (raw):', result); // Debug log
+      
+      // Handle double-encoded JSON (when the result is a JSON string instead of an object)
+      if (typeof result === 'string') {
+        try {
+          result = JSON.parse(result);
+          console.log('OCR Result after parsing string:', result); // Debug log
+        } catch (parseError) {
+          console.error('Failed to parse JSON string:', parseError);
+          throw new Error(`Received invalid JSON string: ${result}`);
+        }
+      }
+      
       setOcrResult(result);
     } catch (err) {
+      console.error('Error processing invoice:', err); // Debug log
       setError(err instanceof Error ? err.message : 'An error occurred while processing the invoice');
     } finally {
       setIsLoading(false);
@@ -91,7 +115,12 @@ function App() {
     setIsLoading(false);
   };
 
-  const renderValue = (value: any): React.ReactNode => {
+  const renderValue = (value: any, depth: number = 0): React.ReactNode => {
+    // Prevent infinite recursion for deeply nested objects
+    if (depth > 10) {
+      return <span className="text-gray-400 italic text-sm">[Max depth reached]</span>;
+    }
+
     if (value === null || value === undefined) {
       return <span className="text-gray-400 italic text-sm">null</span>;
     }
@@ -105,10 +134,18 @@ function App() {
     }
     
     if (typeof value === 'string') {
-      return <span className="text-gray-800 break-words">{value}</span>;
+      // Handle empty strings
+      if (value === '') {
+        return <span className="text-gray-400 italic text-sm">[empty string]</span>;
+      }
+      return <span className="text-gray-800 break-words whitespace-pre-wrap">{value}</span>;
     }
     
     if (Array.isArray(value)) {
+      if (value.length === 0) {
+        return <span className="text-gray-400 italic text-sm">[empty array]</span>;
+      }
+      
       return (
         <div className="ml-2 mt-1">
           <div className="text-xs text-gray-500 mb-1">Array ({value.length} items)</div>
@@ -116,7 +153,7 @@ function App() {
             <div key={index} className="border-l-2 border-blue-200 pl-3 py-1 ml-2">
               <div className="flex items-start gap-2">
                 <span className="text-xs text-blue-600 font-mono bg-blue-50 px-1 rounded">[{index}]</span>
-                <div className="flex-1">{renderValue(item)}</div>
+                <div className="flex-1">{renderValue(item, depth + 1)}</div>
               </div>
             </div>
           ))}
@@ -125,16 +162,21 @@ function App() {
     }
     
     if (typeof value === 'object') {
+      const keys = Object.keys(value);
+      if (keys.length === 0) {
+        return <span className="text-gray-400 italic text-sm">[empty object]</span>;
+      }
+      
       return (
         <div className="ml-2 mt-1">
-          <div className="text-xs text-gray-500 mb-1">Object ({Object.keys(value).length} properties)</div>
+          <div className="text-xs text-gray-500 mb-1">Object ({keys.length} properties)</div>
           {Object.entries(value).map(([key, val]) => (
             <div key={key} className="border-l-2 border-indigo-200 pl-3 py-2 ml-2">
               <div className="flex items-start gap-2">
                 <span className="font-medium text-indigo-700 min-w-0 font-mono text-sm bg-indigo-50 px-2 py-0.5 rounded">
                   {key}:
                 </span>
-                <div className="min-w-0 flex-1">{renderValue(val)}</div>
+                <div className="min-w-0 flex-1">{renderValue(val, depth + 1)}</div>
               </div>
             </div>
           ))}
@@ -142,7 +184,8 @@ function App() {
       );
     }
     
-    return <span>{String(value)}</span>;
+    // Fallback for any other type
+    return <span className="text-gray-600">{String(value)}</span>;
   };
 
   return (
@@ -231,9 +274,26 @@ function App() {
             </div>
 
             {error && (
-              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-                <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
-                <p className="text-red-800">{error}</p>
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-start gap-2 mb-2">
+                  <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-medium text-red-800 mb-1">Error Processing Invoice</h4>
+                    <p className="text-red-700 break-words">{error}</p>
+                  </div>
+                </div>
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-sm text-red-600 hover:text-red-800">
+                    Troubleshooting Tips
+                  </summary>
+                  <div className="mt-2 text-sm text-red-600 space-y-1">
+                    <p>• Check if the backend server is running at: <code className="bg-red-100 px-1 rounded">{BACKEND_URL}</code></p>
+                    <p>• Ensure the file is a valid PDF, JPG, or PNG format</p>
+                    <p>• Check browser console for additional error details</p>
+                    <p>• Verify the backend API is configured to accept the uploaded file format</p>
+                    <p>• If you see "double-encoded JSON" errors, the backend may be returning a JSON string instead of a JSON object</p>
+                  </div>
+                </details>
               </div>
             )}
           </div>
@@ -274,22 +334,42 @@ function App() {
                 </div>
               </div>
 
+              {/* Data type and size information */}
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-sm text-blue-800">
+                  <strong>Data Type:</strong> {Array.isArray(ocrResult) ? 'Array' : typeof ocrResult} | 
+                  <strong> Properties:</strong> {typeof ocrResult === 'object' && ocrResult ? Object.keys(ocrResult).length : 'N/A'} | 
+                  <strong> JSON Size:</strong> {JSON.stringify(ocrResult).length} characters
+                </div>
+              </div>
+
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 max-h-[600px] overflow-auto border">
                 <div className="space-y-3">
-                  {Object.entries(ocrResult).map(([key, value]) => (
-                    <div key={key} className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0">
-                          <span className="inline-block bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-mono px-3 py-1 rounded-full">
-                            {key}
-                          </span>
+                  {typeof ocrResult === 'object' && ocrResult !== null ? (
+                    Object.entries(ocrResult).map(([key, value]) => (
+                      <div key={key} className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0">
+                            <span className="inline-block bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-mono px-3 py-1 rounded-full">
+                              {key}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="mt-1">{renderValue(value, 0)}</div>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="mt-1">{renderValue(value)}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                      <div className="text-center text-gray-600">
+                        <p className="mb-2">Received non-object response:</p>
+                        <div className="bg-gray-100 p-3 rounded font-mono text-sm">
+                          {renderValue(ocrResult, 0)}
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
 
