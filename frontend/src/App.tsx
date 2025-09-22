@@ -5,7 +5,7 @@ interface OCRResult {
   [key: string]: any;
 }
 
-const BACKEND_URL = 'https://1af4c503bf20.ngrok-free.app/parse-invoice-image';
+const BACKEND_URL = 'https://72d8056c962d.ngrok-free.app//parse-invoice-image';
 
 function App() {
   const [file, setFile] = useState<File | null>(null);
