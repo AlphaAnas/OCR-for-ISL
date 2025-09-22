@@ -5,6 +5,8 @@ interface OCRResult {
   [key: string]: any;
 }
 
+const BACKEND_URL = 'https://1af4c503bf20.ngrok-free.app/parse-invoice-image';
+
 function App() {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -64,7 +66,7 @@ function App() {
       formData.append('image', file);
 
       // Replace with your actual Flask API endpoint
-      const response = await fetch('https://bc17caf1891c.ngrok-free.app/parse-invoice-image', {
+      const response = await fetch(BACKEND_URL, {
         method: 'POST',
         body: formData,
       });
@@ -312,7 +314,7 @@ function App() {
         {/* Footer */}
         <div className="text-center mt-12 text-gray-500">
           <p className="text-sm">
-            Connected to Flask API at <code className="bg-gray-200 px-2 py-1 rounded">https://bc17caf1891c.ngrok-free.app/</code>
+            Connected to Flask API at <code className="bg-gray-200 px-2 py-1 rounded">{BACKEND_URL}</code>
           </p>
         </div>
       </div>
