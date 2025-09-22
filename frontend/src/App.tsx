@@ -64,7 +64,7 @@ function App() {
       formData.append('image', file);
 
       // Replace with your actual Flask API endpoint
-      const response = await fetch('https://776283653cf7.ngrok-free.app/parse-invoice-image', {
+      const response = await fetch('https://ocr-for-isl.onrender.com/parse-invoice-image', {
         method: 'POST',
         body: formData,
       });
@@ -312,7 +312,7 @@ function App() {
         {/* Footer */}
         <div className="text-center mt-12 text-gray-500">
           <p className="text-sm">
-            Connected to Flask API at <code className="bg-gray-200 px-2 py-1 rounded">https://776283653cf7.ngrok-free.app/parse-invoice-image</code>
+            Connected to Flask API at <code className="bg-gray-200 px-2 py-1 rounded">https://ocr-for-isl.onrender.com/</code>
           </p>
         </div>
       </div>
