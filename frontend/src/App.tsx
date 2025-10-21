@@ -7,7 +7,7 @@ interface OCRResult {
 
 
 
-const BACKEND_URL = 'https://7490993dbbdd.ngrok-free.app/parse-invoice-image';
+const BACKEND_URL = 'https://70f3c2ae5133.ngrok-free.app/parse-invoice-image';
 
 function App() {
   const [file, setFile] = useState<File | null>(null);
@@ -313,6 +313,7 @@ function App() {
                     onClick={() => {
                       navigator.clipboard.writeText(JSON.stringify(ocrResult, null, 2));
                       // You could add a toast notification here
+                
                     }}
                     className="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-200 transition-colors"
                   >
